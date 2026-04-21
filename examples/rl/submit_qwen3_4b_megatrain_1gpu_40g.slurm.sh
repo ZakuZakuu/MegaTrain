@@ -1,25 +1,44 @@
 #!/bin/bash
-#SBATCH --job-name=grpo-qwen3-4b-40g
+
+#SBATCH -o job.%j.out
+#SBATCH -J grpo-qwen3-4b-40g
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=16
-#SBATCH --gres=gpu:1
-#SBATCH --mem=200G
+#SBATCH --ntasks=16
+#SBATCH --partition=gpu
 #SBATCH --time=24:00:00
-#SBATCH --output=logs/slurm-%x-%j.out
-#SBATCH --error=logs/slurm-%x-%j.err
+#SBATCH --gres=gpu:1
 
-set -euo pipefail
+# 禁用输出缓冲
+export PYTHONUNBUFFERED=1
 
-# Optional, set based on your cluster policy:
-# #SBATCH --partition=<your_partition>
-# #SBATCH --account=<your_account>
+source ~/.bashrc
 
-cd MegaTrain
+cd /home/u220320627/MegaTrain
 
 # Activate your cluster runtime environment here.
-# source /path/to/venv/bin/activate
+CONDA_ENV_NAME="${CONDA_ENV_NAME:-MegaTrain}"
+conda activate "$CONDA_ENV_NAME"
 # module load cuda/12.1
+
+# Make local verl package importable in this job environment.
+export PYTHONPATH="$PWD/verl:${PYTHONPATH:-}"
+python -m pip install -e ./verl --no-deps >/dev/null 2>&1 || true
+
+echo "=========================================="
+echo "Job started at: $(date)"
+echo "Job ID: $SLURM_JOB_ID"
+echo "Running on node: $(hostname)"
+echo "=========================================="
+
+# 打印环境信息
+echo "========== Environment Info =========="
+nvidia-smi
+which python
+python --version
+conda info --envs
+echo "CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES:-not set}"
+echo "CUDA_VISIBLE_DEVICES: $CUDA_VISIBLE_DEVICES"
+echo "======================================"
 
 mkdir -p logs
 

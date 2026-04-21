@@ -64,9 +64,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.megatrain.checkpoint_interval=4 \
     actor_rollout_ref.actor.megatrain.num_grad_slabs=12 \
     actor_rollout_ref.actor.megatrain.max_seq_len=1024 \
-    # flash_attention_2 requires the `flash-attn` package (FlashAttention 2, e.g. version 2.x)
-    # and a compatible NVIDIA GPU architecture such as Ampere or newer.
-    actor_rollout_ref.actor.megatrain.attn_implementation=flash_attention_2 \
+    actor_rollout_ref.actor.megatrain.attn_implementation=sdpa \
     \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.ref.strategy=megatrain \
@@ -76,7 +74,6 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.ignore_eos=False \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
-    # No default quantization for A100 40GB target; enable fp8 manually on compatible GPUs.
     actor_rollout_ref.rollout.gpu_memory_utilization=0.45 \
     actor_rollout_ref.rollout.n=1 \
     actor_rollout_ref.rollout.agent.num_workers=1 \
