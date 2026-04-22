@@ -284,7 +284,7 @@ class MegaTrainEngine(BaseEngine):
                 adamw_mode=True,
             )
             logger.info("Using DeepSpeed CPUAdam optimizer")
-        except ImportError:
+        except Exception as e:
             optimizer = torch.optim.AdamW(
                 self.cpu_master.get_parameters(),
                 lr=lr,
@@ -292,7 +292,10 @@ class MegaTrainEngine(BaseEngine):
                 eps=eps,
                 weight_decay=weight_decay,
             )
-            logger.info("Using PyTorch AdamW optimizer (DeepSpeed CPUAdam not available)")
+            logger.warning(
+                "Falling back to PyTorch AdamW because DeepSpeed CPUAdam init failed: %s",
+                str(e),
+            )
 
         return optimizer
 
