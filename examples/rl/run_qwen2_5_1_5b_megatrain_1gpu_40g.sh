@@ -1,6 +1,6 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------
-# GRPO Training: Qwen3-4B on a Single GPU via VERL + MegaTrain
+# GRPO Training: Qwen2.5-1.5B on a Single GPU via VERL + MegaTrain
 # -----------------------------------------------------------------------------
 #
 # Architecture:
@@ -8,32 +8,28 @@
 #   MegaTrain     -- training on CPU->GPU
 #   Both coexist on one GPU; no weight reload between phases.
 #
-# Hardware target: Single A100 40GB.
+# Hardware target: Single A100 40GB, CPU RAM >= 64GB.
+# Goal: prioritize stability (run through) before speed.
 #
 # Usage:
-#   # Default (GSM8K, auto-download model from HuggingFace)
-#   CUDA_VISIBLE_DEVICES=0 bash examples/rl/run_qwen3_4b_megatrain_1gpu_40g.sh
+#   CUDA_VISIBLE_DEVICES=0 bash examples/rl/run_qwen2_5_1_5b_megatrain_1gpu_40g.sh
 #
-#   # Custom model path and data
-#   MODEL_PATH=/path/to/Qwen3-4B \
+# Optional overrides:
+#   MODEL_PATH=/path/to/Qwen2.5-1.5B \
 #   TRAIN_FILE=/path/to/train.parquet \
 #   TEST_FILE=/path/to/test.parquet \
-#   CUDA_VISIBLE_DEVICES=0 bash examples/rl/run_qwen3_4b_megatrain_1gpu_40g.sh
-#
-#   # Override any VERL config via CLI (Hydra syntax)
-#   CUDA_VISIBLE_DEVICES=0 bash examples/rl/run_qwen3_4b_megatrain_1gpu_40g.sh \
-#       data.train_batch_size=4 actor_rollout_ref.rollout.n=2
+#   CUDA_VISIBLE_DEVICES=0 bash examples/rl/run_qwen2_5_1_5b_megatrain_1gpu_40g.sh
 # -----------------------------------------------------------------------------
 
 set -x
 
 # -- Defaults (override via environment) --------------------------------------
-MODEL_PATH=${MODEL_PATH:-"Qwen/Qwen3-4B"}
+MODEL_PATH=${MODEL_PATH:-"Qwen/Qwen2.5-1.5B"}
 TRAIN_FILE=${TRAIN_FILE:-"$HOME/data/gsm8k/train.parquet"}
 TEST_FILE=${TEST_FILE:-"$HOME/data/gsm8k/test.parquet"}
 
-PROJECT_NAME=${PROJECT_NAME:-"GRPO-Qwen3-4B-MegaTrain-40G"}
-EXP_NAME=${EXP_NAME:-"grpo-4b-1gpu-40g"}
+PROJECT_NAME=${PROJECT_NAME:-"GRPO-Qwen2_5-1_5B-MegaTrain-40G"}
+EXP_NAME=${EXP_NAME:-"grpo-1_5b-1gpu-40g"}
 LOG_DIR=${LOG_DIR:-"logs"}
 
 # -- Derived ------------------------------------------------------------------
@@ -72,7 +68,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.megatrain.checkpoint_interval=4 \
     actor_rollout_ref.actor.megatrain.num_grad_slabs=12 \
     actor_rollout_ref.actor.megatrain.max_seq_len=1024 \
-    actor_rollout_ref.actor.megatrain.attn_implementation=sdpa \
+    actor_rollout_ref.actor.megatrain.attn_implementation=flash_attention_2 \
     \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.ref.strategy=megatrain \
@@ -82,20 +78,20 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.ignore_eos=False \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.35 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.50 \
     actor_rollout_ref.rollout.quantization=null \
     actor_rollout_ref.rollout.n=1 \
     actor_rollout_ref.rollout.agent.num_workers=1 \
     actor_rollout_ref.rollout.enable_chunked_prefill=True \
-    actor_rollout_ref.rollout.max_num_batched_tokens=512 \
+    actor_rollout_ref.rollout.max_num_batched_tokens=2048 \
     actor_rollout_ref.rollout.free_cache_engine=False \
-    actor_rollout_ref.rollout.enforce_eager=True \
-    actor_rollout_ref.rollout.enable_prefix_caching=False \
+    actor_rollout_ref.rollout.enforce_eager=False \
+    actor_rollout_ref.rollout.enable_prefix_caching=True \
     actor_rollout_ref.rollout.checkpoint_engine.update_weights_bucket_megabytes=64 \
     \
     algorithm.use_kl_in_reward=False \
     trainer.critic_warmup=0 \
-    'trainer.logger=[console]' \
+    'trainer.logger=[console,tensorboard]' \
     trainer.project_name="${PROJECT_NAME}" \
     trainer.experiment_name="${EXP_NAME}" \
     trainer.n_gpus_per_node=1 \
@@ -105,4 +101,4 @@ python3 -m verl.trainer.main_ppo \
     trainer.save_freq=10 \
     trainer.test_freq=10 \
     trainer.total_epochs=1 \
-    "$@" 2>&1 | tee "${LOG_DIR}/grpo-qwen3-4b-40g-${TIMESTAMP}.log"
+    "$@" 2>&1 | tee "${LOG_DIR}/grpo-qwen2_5-1_5b-40g-${TIMESTAMP}.log"

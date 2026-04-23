@@ -928,6 +928,17 @@ class CPUMasterModel:
 
     def _build_layer_kwargs(self, mask, cache_position, position_ids, position_embeddings):
         """Build kwargs dict for layer forward, based on what the layer accepts."""
+        # For SDPA, decoder layers need a causal + padding mask that is
+        # broadcastable to [B, num_heads, T, T]. When input mask is [B, T]
+        # (1=valid, 0=pad), construct a bool mask with True=masked.
+        attn_impl = getattr(self._model_config, "_attn_implementation", self.config.attn_implementation)
+        if mask is not None and attn_impl == "sdpa" and mask.ndim == 2:
+            valid_tokens = mask != 0
+            seq_len = valid_tokens.shape[1]
+            causal = torch.triu(torch.ones((seq_len, seq_len), dtype=torch.bool, device=mask.device), diagonal=1)
+            padding = (~valid_tokens).unsqueeze(1).unsqueeze(2)
+            mask = causal.unsqueeze(0).unsqueeze(0) | padding
+
         kwargs = {
             'attention_mask': mask,
             'use_cache': False,

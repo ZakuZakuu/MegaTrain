@@ -700,7 +700,14 @@ class ActorRolloutRefWorker(Worker, DistProfilerExtension):
 
         # 1. resume rollout memory (weights were released during sleep)
         if self.config.rollout.free_cache_engine:
-            await self.rollout.resume(tags=["weights"])
+            try:
+                await self.rollout.resume(tags=["weights"])
+            except Exception as exc:
+                logger.warning(
+                    "Rollout memory resume failed; continuing with weight sync because this path is an optional "
+                    "memory-optimization step. Error: %s",
+                    exc,
+                )
         log_gpu_memory_usage("After resume weights", logger=logger)
 
         # 2. determine if we need a base weight sync (adapter path only)
